@@ -1,6 +1,9 @@
 #!/usr/bin/env python
 # -*- coding:utf-8 -*-
 import datetime
+
+from gevent import monkey; monkey.patch_socket(); monkey.patch_all()
+import gevent
 import os
 import re
 import urllib
@@ -30,7 +33,7 @@ class Crawler:
     def __init__(self, t=0.1):
         self.time_sleep = t
 
-    def timecast(self, starttime):
+    def timecast(self,starttime):
         print((datetime.datetime.now() - starttime).seconds)
 
     # 获取后缀名
@@ -49,12 +52,12 @@ class Crawler:
         else:
             return par.netloc
 
-        # 保存图片
+    # 保存图片
     def save_image(self, rsp_data, word):
         if not os.path.exists(path + word):
             os.mkdir(path + word)
         # 判断名字是否重复，获取图片长度
-        self.__counter = len(os.listdir(path + word)) + 1
+
         for image_info in rsp_data['imgs']:
 
             try:
@@ -74,7 +77,6 @@ class Crawler:
                 print(urllib_err)
                 continue
             except Exception as err:
-                time.sleep(1)
                 print(err)
                 print("产生未知错误，放弃保存")
                 continue
@@ -84,38 +86,34 @@ class Crawler:
         return
 
     # 开始获取
-    def get_images(self, word='美女'):
+    def get_images(self, i, word='美女'):
         search = urllib.parse.quote(word)
         # pn int 图片数
-        pn = self.__start_amount
-        while pn < self.__amount:
-
-            url = 'http://image.baidu.com/search/avatarjson?tn=resultjsonavatarnew&ie=utf-8&word=' + search + '&cg=girl&pn=' + str(
-                pn) + '&rn=60&itg=0&z=0&fr=&width=&height=&lm=-1&ic=0&s=0&st=-1&gsm=1e0000001e'
-            # 设置header防ban
-            try:
-                time.sleep(self.time_sleep)
-                req = urllib.request.Request(url=url, headers=self.headers)
-                page = urllib.request.urlopen(req)
-                rsp = page.read().decode('unicode_escape')
-            except UnicodeDecodeError as e:
-                print(e)
-                print('-----UnicodeDecodeErrorurl:', url)
-            except urllib.error.URLError as e:
-                print(e)
-                print("-----urlErrorurl:", url)
-            except socket.timeout as e:
-                print(e)
-                print("-----socket timout:", url)
-            else:
-                # 解析json
-                rsp_data = json.loads(rsp)
-                self.save_image(rsp_data, word)
-                # 读取下一页
-                print("下载下一页")
-                pn += 60
-            finally:
-                page.close()
+        url = 'http://image.baidu.com/search/avatarjson?tn=resultjsonavatarnew&ie=utf-8&word=' + search + '&cg=girl&pn=' + str(
+            i) + '&rn=60&itg=0&z=0&fr=&width=&height=&lm=-1&ic=0&s=0&st=-1&gsm=1e0000001e'
+        # 设置header防ban
+        try:
+            time.sleep(self.time_sleep)
+            req = urllib.request.Request(url=url, headers=self.headers)
+            page = urllib.request.urlopen(req)
+            rsp = page.read().decode('unicode_escape')
+        except UnicodeDecodeError as e:
+            print(e)
+            print('-----UnicodeDecodeErrorurl:', url)
+        except urllib.error.URLError as e:
+            print(e)
+            print("-----urlErrorurl:", url)
+        except socket.timeout as e:
+            print(e)
+            print("-----socket timout:", url)
+        else:
+            # 解析json
+            rsp_data = json.loads(rsp)
+            self.save_image(rsp_data, word)
+            # 读取下一页
+            print("下载下一页")
+        finally:
+            page.close()
         print("下载任务结束")
         return
 
@@ -129,14 +127,15 @@ class Crawler:
         """
         self.__start_amount = (start_page - 1) * 60
         self.__amount = spider_page_num * 60 + self.__start_amount
-        self.get_images(word)
+
+        starttime = datetime.datetime.now()
+        for i in range(1):
+            gevent.spawn(self.get_images(i, word))
+
+        self.timecast(starttime)
 
 
 if __name__ == '__main__':
     crawler = Crawler(0.05)  # 抓取延迟为 0.05
-
-    # crawler.start('美女', 10, 2)  # 抓取关键词为 “美女”，总数为 1 页（即总共 1*60=60 张），开始页码为 2
-    starttime = datetime.datetime.now()
     crawler.start('复古', 1, 1)  # 抓取关键词为 “二次元 美女”，总数为 10 页（即总共 10*60=600 张），起始抓取的页码为 1
-    crawler.timecast(starttime)
-    # crawler.start('帅哥', 5)  # 抓取关键词为 “帅哥”，总数为 5 页（即总共 5*60=300 张）
+
