@@ -21,7 +21,6 @@ lock = threading.Lock()
 class PTConnectionPool(object):
     __pool = None
 
-
     def __enter__(self):
         self.conn = self.getConn()
         self.cursor = self.conn.cursor()
@@ -53,8 +52,8 @@ class PTConnectionPool(object):
         print("PT连接池释放con和cursor")
 
 
-"""
-@功能：获取PT数据库连接
-"""
 def getPTConnection():
+    """
+    @功能：获取PT数据库连接
+    """
     return PTConnectionPool()
